@@ -1,0 +1,21 @@
+# This repo lives inside a live WoW client's AddOns folder, so keep anything the
+# client or the OS drops next to the source out of it.
+
+# SavedVariables. These live in WTF\ rather than here, but a copy pulled in for
+# debugging carries character names and a full match history -- never commit one.
+FycoPvPDB.lua
+FycoPvPLog.lua
+FycoPvPArchive.lua
+*.lua.bak
+
+# release artefacts, built by packaging into a folder named FycoPvP
+FycoPvP-*.zip
+/dist/
+
+# editors and OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
+.DS_Store

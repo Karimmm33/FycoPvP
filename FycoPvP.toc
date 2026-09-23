@@ -1,0 +1,31 @@
+## Interface: 30300
+## Title: FycoPvP
+## Notes: Unified PvP UI - nameplates, auras, alerts, procs, control, cooldowns, casts, recap, spec, range, lockout, stats
+## Author: Karim
+## Version: 1.16.0
+## SavedVariables: FycoPvPDB
+## SavedVariablesPerCharacter: FycoPvPLog, FycoPvPArchive
+## X-Modules: Core, Control, Procs, Casts, Auras, Alerts, Cooldowns, Plates, Bar, Buffs, Spec, Range, Lockout, Recap, Stats, Announce, Options, Logger
+
+Data.lua
+Core.lua
+Modules\Control.lua
+Modules\Procs.lua
+Modules\Casts.lua
+Modules\Auras.lua
+Modules\Alerts.lua
+Modules\Cooldowns.lua
+Modules\Plates.lua
+Modules\Dispel.lua
+Modules\CDText.lua
+Modules\Bar.lua
+Modules\Buffs.lua
+Modules\Spec.lua
+Modules\Range.lua
+Modules\Lockout.lua
+Modules\Recap.lua
+Modules\Stats.lua
+Modules\Archive.lua
+Modules\Announce.lua
+Modules\Options.lua
+Modules\Logger.lua
