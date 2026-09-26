@@ -222,7 +222,8 @@ local function BuildPanel()
 
 	local note = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
 	note:SetPoint("TOPLEFT", 16, -42)
-	note:SetWidth(460)
+	-- the options area is only about 410 wide; a fixed 460 ran off its edge
+	note:SetWidth(ns:OptionsContentWidth() - 24)
 	note:SetJustifyH("LEFT")
 	note:SetText("Shows only what is MISSING, and hides completely when "
 	          .. "everything is up. Type a buff name or spell ID, or 'pet' to "

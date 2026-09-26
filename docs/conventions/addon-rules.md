@@ -22,7 +22,12 @@ So:
   Content longer than the view then scrolls instead of escaping.
 - **After building a panel, call `Finish()`** so the scroll child is sized to
   the deepest column. Forget it and scrolling silently does nothing.
-- **Two columns maximum**, at `COL1 = 8` and `COL2 = 250`, each 230 wide.
+- **Two columns maximum**, sized by `Layout()` from the real width of
+  `InterfaceOptionsFramePanelContainer` (about 410 in 3.3.5a, so each column
+  is about 180). Never assume a width: fixed 230-wide columns ran past the
+  right edge in game, where nothing could be clicked. Button widths are
+  capped to the column; hand-built pages (Cooldown Bar, Buffs) size their
+  text from `ns:OptionsContentWidth()`.
   A third column runs off the right edge — that was the first occurrence.
 - Widget heights the cursor assumes: check 24, title 34, button 28, swatch 28,
   slider 48 (its min/max labels hang *below* it), note = measured with

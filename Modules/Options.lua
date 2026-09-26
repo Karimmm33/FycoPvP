@@ -28,9 +28,32 @@
 local ADDON, ns = ...
 local M = ns:Module("options")
 
--- column origins and width. Two columns is the maximum that fits.
-local COL1, COL2, COL_W = 8, 250, 230
-local SLIDER_W = 180
+-- Column origins and width, measured rather than assumed. The 3.3.5a
+-- options area is only about 410 wide (the old "500" was a guess), and two
+-- 230-wide columns ran past its right edge, where nothing could be clicked.
+-- Layout() sizes both columns to the real width before any panel is built.
+local SCROLL_INSET = 4 + 28          -- scroll frame's left inset + scroll bar
+local FALLBACK_W = 410               -- the container's width in the stock 3.3.5a UI
+local COL_GAP = 12
+local COL1, COL2, COL_W = 8, 0, 0
+local SLIDER_W, CONTENT_W = 0, 0
+
+local function Layout()
+	local c = InterfaceOptionsFramePanelContainer
+	local w = c and c.GetWidth and c:GetWidth() or 0
+	if not w or w < 200 then w = FALLBACK_W end
+	CONTENT_W = math.floor(w - SCROLL_INSET)
+	COL_W = math.floor((CONTENT_W - COL1 - COL_GAP - 4) / 2)
+	COL2 = COL1 + COL_W + COL_GAP
+	SLIDER_W = COL_W - 30
+end
+
+--- The width a full-width options page may use; the hand-built Cooldown
+--- Bar and Buffs pages size their text from it.
+function ns:OptionsContentWidth()
+	if CONTENT_W == 0 then Layout() end
+	return CONTENT_W
+end
 
 -- how far the cursor advances per widget. A Note measures itself instead.
 local H_CHECK, H_TITLE, H_BTN, H_SWATCH = 24, 34, 28, 28
@@ -55,7 +78,7 @@ local function MakePanel(key, displayName, parentName)
 	scroll:SetPoint("BOTTOMRIGHT", -28, 8)
 
 	local content = CreateFrame("Frame", nil, scroll)
-	content:SetWidth(490)
+	content:SetWidth(CONTENT_W)
 	content:SetHeight(500)
 	scroll:SetScrollChild(content)
 
@@ -132,7 +155,7 @@ function Column:Note(text)
 	-- laid the string out yet, fall back to an estimate from how many lines
 	-- this much text needs at this width -- erring long, never short.
 	local h = fs:GetStringHeight() or 0
-	if h < 1 then h = 11 * math.max(1, math.ceil(#text / 42)) end
+	if h < 1 then h = 11 * math.max(1, math.ceil(#text / math.floor(COL_W / 5.5))) end
 	self:advance(math.ceil(h) + 8)
 	return fs
 end
@@ -195,7 +218,7 @@ end
 function Column:Button(label, fn, w)
 	local b = CreateFrame("Button", nil, self.frame, "UIPanelButtonTemplate")
 	b:SetPoint("TOPLEFT", self.x + 4, self.y)
-	b:SetWidth(w or 150)
+	b:SetWidth(math.min(w or 150, COL_W - 4))
 	b:SetHeight(22)
 	b:SetText(label)
 	b:SetScript("OnClick", fn)
@@ -203,18 +226,19 @@ function Column:Button(label, fn, w)
 	return b
 end
 
---- Two buttons side by side, costing one row.
+--- Two buttons side by side, costing one row, splitting the column.
 function Column:Buttons(l1, f1, l2, f2)
+	local bw = math.floor((COL_W - 4 - 4) / 2)
 	local a = CreateFrame("Button", nil, self.frame, "UIPanelButtonTemplate")
 	a:SetPoint("TOPLEFT", self.x + 4, self.y)
-	a:SetWidth(108)
+	a:SetWidth(bw)
 	a:SetHeight(22)
 	a:SetText(l1)
 	a:SetScript("OnClick", f1)
 
 	local b = CreateFrame("Button", nil, self.frame, "UIPanelButtonTemplate")
-	b:SetPoint("TOPLEFT", self.x + 116, self.y)
-	b:SetWidth(108)
+	b:SetPoint("TOPLEFT", self.x + 4 + bw + 4, self.y)
+	b:SetWidth(bw)
 	b:SetHeight(22)
 	b:SetText(l2)
 	b:SetScript("OnClick", f2)
@@ -241,6 +265,8 @@ function Column:Swatch(label, key)
 
 	local fs = b:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 	fs:SetPoint("LEFT", b, "RIGHT", 6, 0)
+	fs:SetWidth(COL_W - 30)            -- keep a long label inside its column
+	fs:SetJustifyH("LEFT")
 	fs:SetText(label)
 
 	local function cur()
@@ -732,6 +758,7 @@ end
 ----------------------------------------------------------------------
 
 function M:OnLoad()
+	Layout()
 	BuildMain()
 	BuildPlates()
 	BuildDebuffs()

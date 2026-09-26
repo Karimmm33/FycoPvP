@@ -286,7 +286,8 @@ local function BuildPanel()
 
 	local note = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
 	note:SetPoint("TOPLEFT", 16, -42)
-	note:SetWidth(540)
+	-- the options area is only about 410 wide; a fixed 540 ran off its edge
+	note:SetWidth(ns:OptionsContentWidth() - 24)
 	note:SetJustifyH("LEFT")
 	note:SetText("Only the cooldowns you pick. Type a spell name or ID; use "
 	          .. "'pet Spell Lock' for a pet ability, or 'trinket1' / 'trinket2' "
