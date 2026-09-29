@@ -102,12 +102,17 @@ local function MakeIcon(parent, size)
 	f.cd = CreateFrame("Cooldown", nil, f, "CooldownFrameTemplate")
 	f.cd:SetAllPoints(f)
 	f.cd:SetReverse(true)
-	-- we draw our own countdown under the icon; stop OmniCC drawing a second
+	-- we draw our own countdown on the icon; stop OmniCC drawing a second
 	-- one over it (its opt-out flag, config.lua:265)
 	f.cd.noCooldownCount = true
 
+	-- Centred INSIDE the icon, the way Blizzard's own debuff frames do it,
+	-- rather than hanging below the art. Same treatment as the cooldown bar
+	-- in Bar.lua, which draws its timer over an identical cooldown frame; the
+	-- outline keeps it legible over both the icon and the sweep. f.count sits
+	-- in the bottom-right corner, so the two never collide.
 	f.time = f:CreateFontString(nil, "OVERLAY")
-	f.time:SetPoint("BOTTOM", f, "BOTTOM", 0, -11)
+	f.time:SetPoint("CENTER", f, "CENTER", 0, 0)
 
 	f.count = f:CreateFontString(nil, "OVERLAY")
 	f.count:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
@@ -172,6 +177,25 @@ local function LayoutRow(row, icons, n, size)
 	row:SetWidth(math.max(1, w))
 	row:SetHeight(math.max(size, h))
 	return h
+end
+
+--- Free-standing, the two rows are centred on the group's frame. Stacked under
+--- a unit frame (Frames.lua turns that on) they go left-aligned, the way
+--- Blizzard's old target auras sat, and an empty top row folds away rather
+--- than leaving a gap above your debuffs. Re-anchors only when that changes.
+local function AnchorRows(g, topEmpty)
+	local key = (g.stacked and "S" or "C") .. (topEmpty and "1" or "0")
+	if g.anchorKey == key then return end
+	g.anchorKey = key
+	g.theirRow:ClearAllPoints()
+	g.mineRow:ClearAllPoints()
+	if g.stacked then
+		g.theirRow:SetPoint("TOPLEFT", g.frame, "TOPLEFT", 0, 0)
+		g.mineRow:SetPoint("TOPLEFT", g.theirRow, "BOTTOMLEFT", 0, topEmpty and 0 or -4)
+	else
+		g.theirRow:SetPoint("TOP", g.frame, "TOP", 0, 0)
+		g.mineRow:SetPoint("TOP", g.theirRow, "BOTTOM", 0, -14)
+	end
 end
 
 ----------------------------------------------------------------------
@@ -278,6 +302,9 @@ local function Refresh(g)
 	for i = m + 1, MAX_MINE  do g.mine[i]:Hide() end
 	LayoutRow(g.theirRow, g.theirs, t, THEIR_SIZE)
 	LayoutRow(g.mineRow,  g.mine,   m, o.mineSize)
+	local topEmpty = g.stacked and t == 0
+	if topEmpty then g.theirRow:SetHeight(1) end
+	AnchorRows(g, topEmpty)
 end
 
 ----------------------------------------------------------------------
@@ -375,6 +402,7 @@ function M:OnLoad()
 				for i = shown + 1, MAX_MINE do g.mine[i]:Hide() end
 				LayoutRow(g.theirRow, g.theirs, 3, THEIR_SIZE)
 				LayoutRow(g.mineRow,  g.mine,   shown, o.mineSize)
+				AnchorRows(g, false)
 			end
 		end
 	end)
@@ -389,6 +417,30 @@ end
 ----------------------------------------------------------------------
 -- config
 ----------------------------------------------------------------------
+
+--- The target or focus group's frame, so the unit frames can dock it under
+--- themselves. nil before this module has loaded.
+function ns:GetAuraGroup(unit)
+	for i = 1, #groups do
+		if groups[i].cfg.unit == unit then return groups[i].frame end
+	end
+	return nil
+end
+
+--- Switch a group between free-standing (centred rows) and stacked under a
+--- unit frame (left-aligned, empty top row folded away). Returns the frame.
+function ns:SetAuraStacked(unit, on)
+	for i = 1, #groups do
+		local g = groups[i]
+		if g.cfg.unit == unit then
+			g.stacked = on and true or false
+			g.anchorKey = nil
+			Refresh(g)
+			return g.frame
+		end
+	end
+	return nil
+end
 
 --- /fyco debuffs [all | plates | mine <n> | other <n>]
 --- Every one of these matches a tick box or slider on the Debuffs panel.

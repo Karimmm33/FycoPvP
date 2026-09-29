@@ -27,7 +27,7 @@ local GetInventoryItemTexture  = GetInventoryItemTexture
 local NUM_PET_SLOTS = 10
 
 local barDefaults = {
-	size = 36, gap = 4, grow = "RIGHT", hideReady = false,
+	size = 36, gap = 4, grow = "RIGHT", hideReady = false, hotkeys = true,
 }
 
 -- A reasonable Affliction starting set. Everything is editable.
@@ -88,6 +88,111 @@ local function Label(entry)
 end
 
 ----------------------------------------------------------------------
+-- hotkeys
+----------------------------------------------------------------------
+
+-- Blizzard's action bars and the key binding each button answers to. The main
+-- bar pages (shift+number, stances, druid forms, stealth); ActionButton's paged
+-- ID follows that, so the key shown is the one that casts it RIGHT NOW.
+local BUTTON_SETS = {
+	{ "ActionButton",              "ACTIONBUTTON" },
+	{ "MultiBarBottomLeftButton",  "MULTIACTIONBAR1BUTTON" },
+	{ "MultiBarBottomRightButton", "MULTIACTIONBAR2BUTTON" },
+	{ "MultiBarRightButton",       "MULTIACTIONBAR3BUTTON" },
+	{ "MultiBarLeftButton",        "MULTIACTIONBAR4BUTTON" },
+}
+
+-- Rebuilt only when something that could change the answer happens (bindings,
+-- bar contents, paging, macros, the pet); see OnLoad. nil = rebuild needed.
+local keyBySpell, keyByItem
+
+--- "CTRL-3" -> "c3", "SHIFT-E" -> "sE", "BUTTON4" -> "M4". Short enough to sit
+--- in an icon's corner, the way Blizzard's own buttons abbreviate them.
+local function ShortKey(key)
+	if not key then return nil end
+	key = key:gsub("CTRL%-", "c"):gsub("SHIFT%-", "s"):gsub("ALT%-", "a")
+	key = key:gsub("MOUSEWHEELUP", "WU"):gsub("MOUSEWHEELDOWN", "WD")
+	key = key:gsub("MIDDLEBUTTON", "M3"):gsub("BUTTON(%d+)", "M%1")
+	key = key:gsub("NUMPAD", "N"):gsub("BACKSPACE", "BS"):gsub("SPACE", "Sp")
+	key = key:gsub("PAGEUP", "PU"):gsub("PAGEDOWN", "PD"):gsub("INSERT", "Ins")
+	key = key:gsub("DELETE", "Del"):gsub("HOME", "Hm")
+	return key
+end
+
+--- What an action slot casts: ("spell", name) or ("item", itemID or name).
+--- Macros count too -- "/cast Spell Lock" is how a pet ability usually ends up
+--- on a bar -- via the spell or item the macro would use.
+local function ActionContent(slot)
+	local kind, id, subType, spellID = GetActionInfo(slot)
+	if kind == "spell" then
+		-- the 4th return is the spell ID where the client gives it; otherwise
+		-- ask the spellbook what sits at that index
+		local name = (spellID and GetSpellInfo(spellID))
+		          or (id and GetSpellName(id, subType or "spell"))
+		return name and "spell", name
+	elseif kind == "macro" then
+		local sname = GetMacroSpell(id)
+		if sname then return "spell", sname end
+		local iname = GetMacroItem(id)
+		if iname then return "item", iname end
+	elseif kind == "item" then
+		return "item", id
+	end
+	return nil
+end
+
+local function BuildKeyMap()
+	keyBySpell, keyByItem = {}, {}
+	for _, set in ipairs(BUTTON_SETS) do
+		for i = 1, 12 do
+			local btn = _G[set[1] .. i]
+			if btn then
+				local key = GetBindingKey(set[2] .. i)
+				local slot = (ActionButton_GetPagedID and ActionButton_GetPagedID(btn)) or btn.action
+				if key and slot then
+					local kind, what = ActionContent(slot)
+					-- first match wins, and the main bar is walked first: the
+					-- key under your fingers beats a copy on a side bar
+					if kind == "spell" and not keyBySpell[what] then
+						keyBySpell[what] = key
+					elseif kind == "item" and not keyByItem[what] then
+						keyByItem[what] = key
+					end
+				end
+			end
+		end
+	end
+end
+
+--- The key that fires this entry, or nil when it is not on a bound button.
+local function KeyFor(entry)
+	if not keyBySpell then BuildKeyMap() end
+	if entry.kind == "spell" then
+		return keyBySpell[entry.name]
+	elseif entry.kind == "pet" then
+		-- a pet ability's own pet-bar key first, then any macro that casts it
+		local slot = PetSlot(entry.name)
+		return (slot and GetBindingKey("BONUSACTIONBUTTON" .. slot)) or keyBySpell[entry.name]
+	elseif entry.kind == "item" then
+		-- the trinket in that slot, placed on a bar directly or used by a macro
+		local id = GetInventoryItemID("player", entry.slot)
+		if not id then return nil end
+		return keyByItem[id] or keyByItem[(GetItemInfo(id))]
+	end
+end
+
+--- /fyco track hotkeys
+function ns:BarToggleHotkeys()
+	local cfg = FycoPvPDB.bar
+	cfg.hotkeys = not cfg.hotkeys
+	for i = 1, #icons do
+		icons[i].keyText = nil
+		icons[i].key:SetText("")
+	end
+	return cfg.hotkeys
+end
+
+----------------------------------------------------------------------
 -- frames
 ----------------------------------------------------------------------
 
@@ -112,6 +217,13 @@ local function MakeIcon(i)
 	f.time = f:CreateFontString(nil, "OVERLAY")
 	f.time:SetFont("Fonts\\FRIZQT__.TTF", 15, "OUTLINE")
 	f.time:SetPoint("CENTER", f, "CENTER", 0, 0)
+
+	-- The key that casts it, in the top-right corner where Blizzard's own
+	-- buttons put theirs, so it reads the same as your action bars.
+	f.key = f:CreateFontString(nil, "OVERLAY")
+	f.key:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
+	f.key:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -2)
+	f.key:SetTextColor(0.90, 0.90, 0.90)
 
 	f:Hide()
 	return f
@@ -167,7 +279,7 @@ local function Refresh(now)
 		return
 	end
 	local cfg  = FycoPvPDB.bar
-	local list = FycoPvPDB.track
+	local list = FycoPvPCharDB.track
 	local changed = false
 
 	for i = 1, #list do
@@ -201,6 +313,13 @@ local function Refresh(now)
 				f.tex:SetDesaturated(false)
 				f.border:SetTexture(0.20, 0.80, 0.30, 1)
 				f.time:SetText("")
+			end
+
+			-- set only when it changes; this runs ten times a second
+			local k = cfg.hotkeys and ShortKey(KeyFor(list[i])) or ""
+			if f.keyText ~= k then
+				f.keyText = k
+				f.key:SetText(k or "")
 			end
 
 			local want = not (cfg.hideReady and not onCD)
@@ -246,23 +365,23 @@ function ns:BarAdd(what)
 		entry = { kind = "spell", name = name, id = id }
 	end
 
-	table.insert(FycoPvPDB.track, entry)
+	table.insert(FycoPvPCharDB.track, entry)
 	if panel and panel.rebuild then panel.rebuild() end
 	return true, Label(entry)
 end
 
 function ns:BarRemove(index)
-	local e = FycoPvPDB.track[index]
+	local e = FycoPvPCharDB.track[index]
 	if not e then return false end
-	table.remove(FycoPvPDB.track, index)
-	local extra = icons[#FycoPvPDB.track + 1]
+	table.remove(FycoPvPCharDB.track, index)
+	local extra = icons[#FycoPvPCharDB.track + 1]
 	if extra then extra:Hide() end
 	if panel and panel.rebuild then panel.rebuild() end
 	return true, Label(e)
 end
 
 function ns:BarList()
-	local list = FycoPvPDB.track
+	local list = FycoPvPCharDB.track
 	if #list == 0 then ns:Print("  nothing tracked yet") return end
 	for i = 1, #list do
 		local ok = Query(list[i]) ~= nil
@@ -314,7 +433,7 @@ local function BuildPanel()
 	local rows = {}
 	panel.rebuild = function()
 		for i = 1, #rows do rows[i]:Hide() end
-		for i = 1, #FycoPvPDB.track do
+		for i = 1, #FycoPvPCharDB.track do
 			local r = rows[i]
 			if not r then
 				r = CreateFrame("Frame", nil, panel)
@@ -331,7 +450,7 @@ local function BuildPanel()
 				rows[i] = r
 			end
 			r.index = i
-			r.text:SetText(i .. ".  " .. Label(FycoPvPDB.track[i]))
+			r.text:SetText(i .. ".  " .. Label(FycoPvPCharDB.track[i]))
 			r.del:SetScript("OnClick", function()
 				local ok, msg = ns:BarRemove(r.index)
 				if ok then ns:Print("stopped tracking " .. msg) end
@@ -351,15 +470,30 @@ function M:OnLoad()
 	for k, v in pairs(barDefaults) do
 		if FycoPvPDB.bar[k] == nil then FycoPvPDB.bar[k] = v end
 	end
-	if not FycoPvPDB.track then
-		FycoPvPDB.track = {}
-		for i = 1, #trackDefaults do
-			FycoPvPDB.track[i] = trackDefaults[i]
+	-- The bar is per character. The first login after it moved seeds it: a
+	-- warlock keeps its old account-wide list (or the warlock defaults), every
+	-- other class starts with just its two trinkets.
+	if not FycoPvPCharDB.track then
+		local _, class = UnitClass("player")
+		local seed = class == "WARLOCK" and (FycoPvPDB.track or trackDefaults)
+		          or { { kind = "item", slot = 13 }, { kind = "item", slot = 14 } }
+		FycoPvPCharDB.track = {}
+		for i = 1, #seed do
+			FycoPvPCharDB.track[i] = seed[i]
 		end
 	end
 
 	Build()
 	BuildPanel()
+
+	-- Anything that can change which key casts a tracked spell throws the
+	-- key map away; the next refresh rebuilds it once.
+	local function KeysChanged() keyBySpell, keyByItem = nil, nil end
+	for _, e in ipairs({ "UPDATE_BINDINGS", "ACTIONBAR_SLOT_CHANGED", "ACTIONBAR_PAGE_CHANGED",
+	                     "UPDATE_BONUS_ACTIONBAR", "UPDATE_MACROS", "PET_BAR_UPDATE",
+	                     "UNIT_PET", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_ENTERING_WORLD" }) do
+		ns:On(e, KeysChanged)
+	end
 
 	ns:OnTick(function(now) Refresh(now) end)
 
@@ -369,7 +503,7 @@ function M:OnLoad()
 		else
 			bar:EnableMouse(true)
 			-- force every icon visible so the bar can be found and dragged
-			for i = 1, #FycoPvPDB.track do
+			for i = 1, #FycoPvPCharDB.track do
 				if not icons[i] then icons[i] = MakeIcon(i) end
 				if not icons[i].tex:GetTexture() then
 					icons[i].tex:SetTexture("Interface\\Icons\\Spell_Shadow_ShadowBolt")

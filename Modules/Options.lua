@@ -353,7 +353,8 @@ local function BuildMain()
 
 	L:Title("FycoPvP")
 	L:Note("Unified PvP interface. Every setting here matches a /fyco command. "
-	    .. "Nameplates, Debuffs, Combat and Dispel have their own tabs.")
+	    .. "Nameplates, Debuffs, Combat and Dispel have their own tabs. Unit "
+	    .. "frames and moving frames are in FycoUI.")
 	L:Gap(6)
 
 	L:Title("Modules")
@@ -394,9 +395,12 @@ local function BuildMain()
 
 	ModList(L, modsLeft)
 	L:Gap(8)
-	L:Button("Unlock / lock frames", function() ns:Fire("ToggleLock") end, 180)
-	L:Note("Unlock shows every frame with placeholder content so it can be "
-	    .. "dragged. Positions save automatically.")
+	L:Button("Unlock / lock frames", function()
+		if FycoUI then FycoUI:ToggleUnlocked() end
+	end, 180)
+	L:Note("Same as /fui lock: unlocks every frame in FycoUI, FycoPvP and "
+	    .. "FycoPvE at once, with placeholder content so it can be dragged. "
+	    .. "Positions save automatically.")
 
 	R:Title("Sound")
 	R:Check("Voice and sound cues", nil,

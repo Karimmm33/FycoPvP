@@ -194,6 +194,10 @@ def undeclared_constants(toks, path, errors):
             continue
         if t.text in KNOWN_GLOBALS:
             continue
+        # SLASH_<NAME>1, SLASH_<NAME>2 ... are globals by WoW convention: the
+        # slash-command system finds them by name, so they must never be local.
+        if t.text.startswith("SLASH_"):
+            continue
 
         prev = toks[idx - 1] if idx else None
         nxt = toks[idx + 1] if idx + 1 < len(toks) else None

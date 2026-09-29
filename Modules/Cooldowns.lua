@@ -61,6 +61,18 @@ local function FadeDR(guid, cat)
 	if e then e.resetAt = GetTime() + ns.DR_RESET end
 end
 
+--- Read-only views for the unit frames, which show a trinket and the worst
+--- DR beside an enemy player. Callers must not modify what they get back.
+--- These read the upvalues on every call, so they stay correct after
+--- MatchStart swaps in fresh tables.
+function ns:GetDR(guid)
+	return guid and dr[guid] or nil
+end
+
+function ns:GetEnemyCD(guid)
+	return guid and ecd[guid] or nil
+end
+
 local function StartCD(guid, spellID)
 	local info = ns.EnemyCD[spellID]
 	if not info then return end
@@ -265,7 +277,12 @@ function M:OnLoad()
 	end)
 
 	ns:OnTick(function(now)
-		Refresh(now)
+		-- While frames are unlocked the rows hold placeholder icons so they can
+		-- be found and dragged. Redrawing from real data wiped those within a
+		-- tick -- with nothing tracked, every icon hid and the rows turned into
+		-- invisible, un-grabbable empty frames. The other modules already skip
+		-- their redraw while unlocked; this one did not.
+		if not drFrame:IsMouseEnabled() then Refresh(now) end
 		if not ns._cdSweep or now - ns._cdSweep > 30 then
 			ns._cdSweep = now
 			for guid in pairs(ecd) do

@@ -30,8 +30,9 @@ LoseControl (CC on you), SoundAlerter (voice cues), and Cheese (proc overlays).
 ## Install
 
 **[Download the latest release](https://github.com/Karimmm33/FycoPvP/releases/latest)**, extract it
-into `Interface\AddOns\`, and restart the client. The zip already contains a correctly named
-`FycoPvP` folder, so there is nothing to rename.
+into `Interface\AddOns\`, and restart the client. The zip contains two correctly named folders,
+`FycoPvP` and `FycoUI`, so there is nothing to rename. **FycoPvP needs FycoUI** — it holds the unit
+frames and the one unlock that moves every frame — and the client will not load FycoPvP without it.
 
 Disable the addons it replaces so they do not fight over the same screen space.
 
@@ -149,6 +150,12 @@ with **no number under it** rather than a guess. That is the main reason this is
 `/fyco auras` explains why a particular plate is showing what it shows, and marks which debuffs
 on your target are yours.
 
+### Unit frames — now in FycoUI
+The unit and raid frames moved to **FycoUI**, which FycoPvP now needs and which ships in the same
+release zip. They keep their PvP mode: beside an enemy player they show the trinket, the worst DR
+and the inferred spec, all read from FycoPvP. Your settings and positions carry over by themselves
+on the first login. See FycoUI's README; `/fyco frames …` still works and forwards to `/fui frames …`.
+
 ### Dispel — the target and focus buff bar
 Does two separate jobs, deliberately kept apart:
 
@@ -232,17 +239,30 @@ A private action bar showing only the cooldowns you choose, anywhere you want. H
 of entry, because they need three different APIs: normal spells (tracked by name, so they follow
 you across ranks), **pet** spells such as Spell Lock, and items.
 
+The list is **per character** — a warlock starts with an Affliction set, every other class with its
+two trinkets. The bar's size and position are shared by all characters.
+
+**Each icon shows the key that casts it**, in the top-right corner the way your action bars do:
+`1`, `c3` (ctrl+3), `sE` (shift+E), `aQ` (alt+Q), `M4` (mouse button 4), `WU` / `WD` (mouse wheel).
+It is read from Blizzard's own action bars — the main bar as it is paged right now (stances, forms,
+stealth), and the four extra bars — so it follows you when you rebind or move a spell. A spell cast
+through a macro counts, pet abilities use the pet bar's key, and a trinket shows the key of the
+button that uses it. Nothing shows for something that is not on a bound button. Action bar addons
+that replace Blizzard's buttons (Bartender, Dominos) are not read.
+
 ```
 /fyco track Spell Lock      add something
 /fyco track                 list what is tracked, numbered
 /fyco untrack 3             remove one
+/fyco track hotkeys         show or hide the keys
 ```
 
 ### Buffs — what is missing
 Watches a list of buffs and shows **only the ones that are missing**. When everything is up the
 frame hides completely. Silent by design — it is a reminder, not an alert.
 
-Defaults for Affliction: Fel Armor, Soul Link, Soulstone Resurrection, and a pet.
+The watch list is **per character**. A warlock starts with the Affliction defaults (Fel Armor, Soul
+Link, Soulstone Resurrection, and a pet); every other class starts empty.
 
 ```
 /fyco buff Fel Armor        add
@@ -279,6 +299,8 @@ see beats a red one that lies.
 /fyco range Shadow Bolt     use a different one
 /fyco range default         back to the class default
 ```
+
+The chosen spell is saved per character.
 
 ### Lockout — interrupts, both directions
 When *you* get kicked: a draining bar naming the locked school and the time left. When your *target*
@@ -362,13 +384,14 @@ Every command is `/fyco <something>`. `/fycopvp` also works.
 | `/fyco` | open the options panel |
 | `/fyco help` | list commands in game |
 | `/fyco status` | modules loaded, units and auras cached |
-| `/fyco lock` | unlock/lock every frame for dragging |
+| `/fyco lock` | same as `/fui lock`: unlock/lock every frame in FycoUI, FycoPvP and FycoPvE |
 | `/fyco perrow <1-20>` | icons per row before a bar wraps (default 7) |
 | `/fyco debug` | toggle debug output |
 | **Display** | |
 | `/fyco plates` | list nameplate settings |
 | `/fyco plates <setting> <number>` | change one (e.g. `petScale 0.7`) |
 | `/fyco plates petauras` | toggle auras on pet plates |
+| `/fyco frames …` | the unit frames, now in FycoUI; forwards to `/fui frames …` |
 | `/fyco debuffs` | show the debuff tracker's settings |
 | `/fyco debuffs all` | bar: every debuff, or only your own |
 | `/fyco debuffs plates` | nameplates: every debuff, or only your own |
@@ -383,6 +406,7 @@ Every command is `/fyco <something>`. `/fycopvp` also works.
 | `/fyco blizz` | toggle Blizzard's cast bars (needs `/reload`) |
 | **Tracking** | |
 | `/fyco track [spell]` | list or add to your cooldown bar |
+| `/fyco track hotkeys` | show or hide each icon's key on the cooldown bar |
 | `/fyco untrack <n>` | remove one by number |
 | `/fyco buff [name]` | list or add to the missing-buff watch |
 | `/fyco unbuff <n>` | remove one by number |
@@ -423,15 +447,17 @@ Under **Interface → AddOns**:
 
 Everything here matches a `/fyco` command, so the two stay in step whichever you use. Changes apply
 immediately — **Plates is the one exception** and needs a `/reload`, because it rewrites Blizzard's
-plate regions and undoing that cleanly at runtime is not worth the complexity.
+plate regions and undoing that cleanly at runtime is not worth the complexity. The unit frames'
+settings are under **Interface → AddOns → FycoUI**.
 
 Every panel scrolls, so a panel with more settings than fits simply scrolls rather than spilling
 its widgets over the game world — which is what used to happen.
 
 ## Moving things around
 
-`/fyco lock` unlocks every frame and fills it with placeholder content so you can see what you are
-dragging. Run it again to lock. Positions save on drop.
+`/fui lock` (or `/fyco lock`) unlocks every frame — FycoPvP's, FycoPvE's and FycoUI's unit frames
+together — and fills each with placeholder content so you can see what you are dragging. Run it
+again to lock. Positions save on drop. `/fui reset` puts everything back.
 
 **Every bar wraps after 7 icons** and continues on a second row — target and focus buffs, their
 defensives, your DoTs, the DR row, enemy cooldowns, procs, missing buffs and your cooldown bar all

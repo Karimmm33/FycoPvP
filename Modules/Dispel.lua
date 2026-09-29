@@ -46,6 +46,12 @@ local PULSE_MIN, PULSE_MAX, PULSE_PERIOD = 0.35, 1.00, 1.1
 
 local rows = {}     -- [unit] = frame
 
+--- The buff row for "target" or "focus", so the unit frames can stack it
+--- under themselves. It hides itself when the unit has no buffs to show.
+function ns:GetBuffRow(unit)
+	return rows[unit]
+end
+
 ----------------------------------------------------------------------
 -- config
 ----------------------------------------------------------------------

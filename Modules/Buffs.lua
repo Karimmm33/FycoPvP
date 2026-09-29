@@ -138,7 +138,7 @@ local function Refresh()
 	end
 	if anchor.preview then return end
 
-	local list = FycoPvPDB.watch
+	local list = FycoPvPCharDB.watch
 	local n = 0
 
 	for i = 1, #list do
@@ -183,22 +183,22 @@ function ns:BuffAdd(what)
 		end
 		entry = { name = name }
 	end
-	table.insert(FycoPvPDB.watch, entry)
+	table.insert(FycoPvPCharDB.watch, entry)
 	if panel and panel.rebuild then panel.rebuild() end
 	return true, Label(entry)
 end
 
 function ns:BuffRemove(index)
-	local e = FycoPvPDB.watch[index]
+	local e = FycoPvPCharDB.watch[index]
 	if not e then return false end
-	table.remove(FycoPvPDB.watch, index)
+	table.remove(FycoPvPCharDB.watch, index)
 	for i = 1, #icons do icons[i]:Hide() end
 	if panel and panel.rebuild then panel.rebuild() end
 	return true, Label(e)
 end
 
 function ns:BuffList()
-	local list = FycoPvPDB.watch
+	local list = FycoPvPCharDB.watch
 	if #list == 0 then ns:Print("  watching nothing") return end
 	for i = 1, #list do
 		local ok = Check(list[i])
@@ -250,7 +250,7 @@ local function BuildPanel()
 	local rows = {}
 	panel.rebuild = function()
 		for i = 1, #rows do rows[i]:Hide() end
-		for i = 1, #FycoPvPDB.watch do
+		for i = 1, #FycoPvPCharDB.watch do
 			local r = rows[i]
 			if not r then
 				r = CreateFrame("Frame", nil, panel)
@@ -267,7 +267,7 @@ local function BuildPanel()
 				rows[i] = r
 			end
 			r.index = i
-			r.text:SetText(i .. ".  " .. Label(FycoPvPDB.watch[i]))
+			r.text:SetText(i .. ".  " .. Label(FycoPvPCharDB.watch[i]))
 			r.del:SetScript("OnClick", function()
 				local ok, msg = ns:BuffRemove(r.index)
 				if ok then ns:Print("stopped watching " .. msg) end
@@ -287,9 +287,24 @@ function M:OnLoad()
 	for k, v in pairs(frameDefaults) do
 		if FycoPvPDB.buffs[k] == nil then FycoPvPDB.buffs[k] = v end
 	end
-	if not FycoPvPDB.watch then
-		FycoPvPDB.watch = {}
-		for i = 1, #watchDefaults do FycoPvPDB.watch[i] = watchDefaults[i] end
+	-- The watch list is per character. The first login after it moved seeds
+	-- it: the defaults are warlock buffs, so only a warlock gets them -- its
+	-- old account-wide list, plus any default a different character's edits
+	-- stripped from it. Every other class starts empty.
+	if not FycoPvPCharDB.watch then
+		local list = {}
+		local _, class = UnitClass("player")
+		if class == "WARLOCK" then
+			local have = {}
+			for _, e in ipairs(FycoPvPDB.watch or {}) do
+				table.insert(list, e)
+				have[e.kind or e.name] = true
+			end
+			for _, e in ipairs(watchDefaults) do
+				if not have[e.kind or e.name] then table.insert(list, e) end
+			end
+		end
+		FycoPvPCharDB.watch = list
 	end
 
 	Build()
@@ -298,8 +313,8 @@ function M:OnLoad()
 	-- Report anything the client cannot resolve. With no names on the icons an
 	-- unresolvable entry would otherwise be a silent question mark.
 	local bad = {}
-	for i = 1, #FycoPvPDB.watch do
-		local e = FycoPvPDB.watch[i]
+	for i = 1, #FycoPvPCharDB.watch do
+		local e = FycoPvPCharDB.watch[i]
 		if e.name and not GetSpellInfo(e.name) then
 			table.insert(bad, i .. ". " .. e.name)
 		end
@@ -333,11 +348,11 @@ function M:OnLoad()
 			anchor:EnableMouse(true)
 			anchor.preview = true
 			-- show every watched entry so the frame can be found and dragged
-			local n = math.min(#FycoPvPDB.watch, MAX_SHOWN)
+			local n = math.min(#FycoPvPCharDB.watch, MAX_SHOWN)
 			if n == 0 then n = 1 end
 			for i = 1, n do
 				if not icons[i] then icons[i] = MakeIcon(i) end
-				local e = FycoPvPDB.watch[i] or { kind = "pet" }
+				local e = FycoPvPCharDB.watch[i] or { kind = "pet" }
 				local _, tex, label = Check(e)
 				icons[i].tex:SetTexture(tex)
 				icons[i]:Show()

@@ -177,6 +177,11 @@ end
 
 local byUnit = {}
 
+--- The bar for "player", "target" or "focus", so the unit frames can dock it.
+function ns:GetCastBar(unit)
+	return byUnit[unit]
+end
+
 --- Place a bar at x,y measured from the bottom-left of the screen -- the same
 --- anchor and numbers MoveAnything shows, so its coordinates can be copied
 --- straight across.

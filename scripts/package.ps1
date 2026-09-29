@@ -56,19 +56,37 @@ foreach ($d in $mirrorDirs) {
     Copy-Item $src -Destination (Join-Path $addon $d) -Recurse -Force
 }
 
+# --- FycoUI, which FycoPvP cannot load without -------------------------------
+# FycoPvP lists FycoUI under ## Dependencies, so a zip with FycoPvP alone would
+# install an addon the client refuses to load. The release carries both
+# folders; extracting the one zip into AddOns is still the whole install.
+$uiRoot = Join-Path (Split-Path -Parent $root) "FycoUI"
+if (-not (Test-Path (Join-Path $uiRoot "FycoUI.toc"))) {
+    throw "FycoUI not found at $uiRoot -- it must sit next to this project, because it ships in the same zip"
+}
+$ui = Join-Path $stage "FycoUI"
+New-Item -ItemType Directory -Path $ui -Force | Out-Null
+foreach ($f in @("FycoUI.toc", "Core.lua", "Data.lua", "README.md", "LICENSE")) {
+    $src = Join-Path $uiRoot $f
+    if (-not (Test-Path $src)) { throw "missing from FycoUI: $f" }
+    Copy-Item $src -Destination (Join-Path $ui $f) -Force
+}
+Copy-Item (Join-Path $uiRoot "Modules") -Destination (Join-Path $ui "Modules") -Recurse -Force
+
 # --- zip ---------------------------------------------------------------------
 $zip = Join-Path $dist "FycoPvP-$version.zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }
-Compress-Archive -Path $addon -DestinationPath $zip -Force
+Compress-Archive -Path $addon, $ui -DestinationPath $zip -Force
 
 # --- verify, because a broken archive is invisible until a user unzips it ----
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $z = [System.IO.Compression.ZipFile]::OpenRead($zip)
 try {
     $names = $z.Entries | ForEach-Object { $_.FullName }
-    $stray = $names | Where-Object { $_ -notlike "FycoPvP/*" }
-    if ($stray) { throw "archive has entries outside FycoPvP/: $($stray -join ', ')" }
+    $stray = $names | Where-Object { $_ -notlike "FycoPvP/*" -and $_ -notlike "FycoUI/*" }
+    if ($stray) { throw "archive has entries outside FycoPvP/ and FycoUI/: $($stray -join ', ')" }
     if ($names -notcontains "FycoPvP/FycoPvP.toc") { throw "archive has no FycoPvP/FycoPvP.toc" }
+    if ($names -notcontains "FycoUI/FycoUI.toc")   { throw "archive has no FycoUI/FycoUI.toc" }
     $count = $z.Entries.Count
 } finally { $z.Dispose() }
 
@@ -77,4 +95,4 @@ Remove-Item $stage -Recurse -Force
 $kb = "{0:N0}" -f ((Get-Item $zip).Length / 1KB)
 Write-Host ""
 Write-Host "  $zip" -ForegroundColor Green
-Write-Host "  $count entries, all under FycoPvP/, toc present, $kb KB" -ForegroundColor Green
+Write-Host "  $count entries: FycoPvP/ and FycoUI/, both tocs present, $kb KB" -ForegroundColor Green

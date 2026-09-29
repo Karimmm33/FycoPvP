@@ -22,6 +22,20 @@ A single PvP interface addon for WoW 3.3.5a (Interface 30300), replacing a
 stack of overlapping addons with one that shares a single event dispatcher and
 a single timer. Public at https://github.com/Karimmm33/FycoPvP.
 
+**It depends on FycoUI** (`D:\Projects\FycoUI`, `## Dependencies: FycoUI`),
+which owns the unit and raid frames and the one `/fui lock` for every frame.
+
+- FycoPvP's modules still unlock on the internal `ToggleLock` message. Core
+  registers ONE entry with `FycoUI:RegisterUnlock` that turns FycoUI's
+  on/off into exactly one `ToggleLock`; `/fyco lock` forwards to FycoUI.
+- FycoUI reads FycoPvP only through the global `FycoPvPAPI` at the end of
+  `Core.lua` (DR, enemy cooldowns, spec, range, and the cast bars and aura rows
+  it docks). Renaming or removing anything it exposes breaks the unit frames
+  silently — treat `FycoPvPAPI` like the archive schema.
+- Deploy FycoUI too when testing: `D:\Projects\FycoUI\scripts\deploy.ps1`.
+- `package.ps1` puts `..\FycoUI` in the release zip beside `FycoPvP\`; it
+  refuses to build if FycoUI is not next to this project.
+
 ## The development loop
 
 **This project is the source of truth. The copy inside the WoW client is

@@ -548,6 +548,10 @@ local defaults = {
 
 ns:On("PLAYER_LOGIN", function()
 	FycoPvPDB = FycoPvPDB or {}
+	-- Per-character settings: the things that only make sense for one class
+	-- (buff watch list, cooldown bar, range spell). They used to live in
+	-- FycoPvPDB, so editing them on one character changed every other one.
+	FycoPvPCharDB = FycoPvPCharDB or {}
 	for k, v in pairs(defaults) do
 		if FycoPvPDB[k] == nil then FycoPvPDB[k] = v end
 	end
@@ -592,6 +596,19 @@ ns:On("PLAYER_LOGIN", function()
 				      .. tostring(err))
 			end
 		end
+	end
+
+	-- Every movable frame in FycoPvP unlocks through FycoUI's one /fui lock.
+	-- The modules still toggle on the internal ToggleLock message, as they
+	-- always have; this turns FycoUI's "set on/off" into exactly one toggle,
+	-- and only when the state actually changes.
+	if FycoUI then
+		FycoUI:RegisterUnlock("FycoPvP", function(on)
+			if (ns.unlocked or false) ~= on then
+				ns.unlocked = on
+				ns:Fire("ToggleLock")
+			end
+		end)
 	end
 
 	ns:Print("v" .. (GetAddOnMetadata(ADDON, "Version") or "?") ..
@@ -720,12 +737,17 @@ SlashCmdList.FYCOPVP = function(input)
 			"- |cffffff00/reload|r to apply")
 
 	elseif cmd == "lock" then
-		ns:Fire("ToggleLock")
+		-- one unlock for all three addons now; kept so the old habit works
+		if FycoUI then FycoUI:ToggleUnlocked() end
 
 	elseif cmd == "track" then
 		if rest == "" then
 			ns:Print("tracked cooldowns (|cffffff00/fyco track <spell>|r to add):")
 			if ns.BarList then ns:BarList() end
+		elseif rest:lower() == "hotkeys" and ns.BarToggleHotkeys then
+			-- no spell is called "hotkeys", so this cannot shadow a real one
+			local on = ns:BarToggleHotkeys()
+			ns:Print("cooldown bar hotkeys " .. (on and "|cff00ff00shown|r" or "|cffff4444hidden|r"))
 		elseif ns.BarAdd then
 			local ok, msg = ns:BarAdd(rest)
 			ns:Print(ok and ("tracking " .. msg) or ("could not add: " .. tostring(msg)))
@@ -790,6 +812,10 @@ SlashCmdList.FYCOPVP = function(input)
 	elseif cmd == "debuffs" then
 		if ns.DebuffConfig then ns:DebuffConfig(rest)
 		else ns:Print("auras module is off") end
+
+	elseif cmd == "frames" then
+		-- the unit frames moved to FycoUI; forward so the old command works
+		if SlashCmdList.FYCOUI then SlashCmdList.FYCOUI("frames " .. rest) end
 
 	elseif cmd == "cds" then
 		if ns.CDReport then ns:CDReport() else ns:Print("cooldowns module is off") end
@@ -877,7 +903,7 @@ SlashCmdList.FYCOPVP = function(input)
 		ns:Print("  |cffffff00/fyco procs|r  - preview each proc overlay in turn")
 		ns:Print("  |cffffff00/fyco sounds|r - play every fallback cue")
 		ns:Print("  |cffffff00/fyco sound|r  - toggle sounds")
-		ns:Print("  |cffffff00/fyco lock|r   - toggle frame dragging")
+		ns:Print("  |cffffff00/fyco lock|r   - same as |cffffff00/fui lock|r: move every frame")
 		ns:Print("  |cffffff00/fyco perrow|r - icons per row before a bar wraps")
 		ns:Print("  |cffffff00/fyco pos|r    - place a cast bar by MoveAnything coordinates")
 		ns:Print("  |cffffff00/fyco scale|r  - resize a cast bar")
@@ -896,9 +922,11 @@ SlashCmdList.FYCOPVP = function(input)
 		ns:Print("  |cffffff00/fyco log|r    - what the logger has measured so far")
 		ns:Print("  |cffffff00/fyco cds|r    - enemy cooldowns corrected against the table")
 		ns:Print("  |cffffff00/fyco debuffs|r- show every debuff, or only your own")
+		ns:Print("  |cffffff00/fyco frames|r - unit frames (in FycoUI): pve, pvp, toggle, auto")
 		ns:Print("  |cffffff00/fyco auras|r  - why the target's plate shows what it shows")
 		ns:Print("  |cffffff00/fyco plates|r - pet/npc nameplate scale and alpha")
 		ns:Print("  |cffffff00/fyco track|r  - your own cooldown bar (add/list)")
+		ns:Print("  |cffffff00/fyco track hotkeys|r - show/hide each icon's key")
 		ns:Print("  |cffffff00/fyco untrack|r- remove one by number")
 		ns:Print("  |cffffff00/fyco buff|r   - missing-buff watch list")
 		ns:Print("  |cffffff00/fyco unbuff|r - remove one by number")
@@ -907,3 +935,28 @@ SlashCmdList.FYCOPVP = function(input)
 		ns:Print("  |cffffff00/fyco debug|r  - toggle debug output")
 	end
 end
+
+----------------------------------------------------------------------
+-- FycoPvPAPI -- the one window other addons get into FycoPvP
+----------------------------------------------------------------------
+
+-- FycoUI's unit frames show a trinket, DR and inferred spec beside enemy
+-- players, fade the target out of range, and dock FycoPvP's cast bars and
+-- aura rows under target and focus. This is everything they may read, and
+-- nothing more: the rest of FycoPvP stays private.
+--
+-- Every entry looks the module up when it is CALLED, not now, so a module
+-- that is switched off -- or loads later -- simply answers nil.
+FycoPvPAPI = {
+	GetDR          = function(guid) return ns.GetDR and ns:GetDR(guid) end,
+	GetEnemyCD     = function(guid) return ns.GetEnemyCD and ns:GetEnemyCD(guid) end,
+	GetSpec        = function(guid) return ns.GetSpec and ns:GetSpec(guid) end,
+	IsHealer       = function(guid) return (ns.IsHealer and ns:IsHealer(guid)) or false end,
+	RangeOut       = function() return ns.RangeOut end,
+	GetCastBar     = function(unit) return ns.GetCastBar and ns:GetCastBar(unit) end,
+	GetAuraGroup   = function(unit) return ns.GetAuraGroup and ns:GetAuraGroup(unit) end,
+	SetAuraStacked = function(unit, on) return ns.SetAuraStacked and ns:SetAuraStacked(unit, on) end,
+	GetBuffRow     = function(unit) return ns.GetBuffRow and ns:GetBuffRow(unit) end,
+	RoleColor      = ns.RoleColor,
+	DRLevelColor   = ns.DRLevelColor,
+}

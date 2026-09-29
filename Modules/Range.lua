@@ -33,7 +33,7 @@ ns.RangeOut = nil
 ----------------------------------------------------------------------
 
 local function Resolve()
-	local want = FycoPvPDB.rangeSpell
+	local want = FycoPvPCharDB.rangeSpell
 	if not want or want == "" then
 		local _, class = UnitClass("player")
 		want = ns.RangeSpell[class]
@@ -126,7 +126,8 @@ function ns:RangeConfig(rest)
 		return
 	end
 	if rest:lower() == "default" then
-		FycoPvPDB.rangeSpell = nil
+		-- false, not nil: nil means "not migrated yet" to OnLoad
+		FycoPvPCharDB.rangeSpell = false
 		Resolve()
 		ns:Print("range spell reset to the class default: "
 		      .. tostring(spellName or "none known"))
@@ -136,12 +137,20 @@ function ns:RangeConfig(rest)
 		ns:Print("|cffff4040" .. rest .. "|r is not a spell you know - not changed")
 		return
 	end
-	FycoPvPDB.rangeSpell = rest
+	FycoPvPCharDB.rangeSpell = rest
 	Resolve()
 	ns:Print("range check now uses |cffffff00" .. rest .. "|r")
 end
 
 function M:OnLoad()
+	-- The range spell is per character. On the first login after it moved,
+	-- keep the old account-wide choice only if this character knows it;
+	-- false means "use the class default".
+	if FycoPvPCharDB.rangeSpell == nil then
+		local old = FycoPvPDB.rangeSpell
+		FycoPvPCharDB.rangeSpell = (old and GetSpellInfo(old)) and old or false
+	end
+
 	frame = Build()
 	Resolve()
 
